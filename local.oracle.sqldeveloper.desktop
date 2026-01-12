@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=SQL Developer (Local)
+Comment=Oracle SQL Developer (locally packaged Flatpak)
+Exec=sqldeveloper
+Icon=local.oracle.sqldeveloper
+Categories=Development;Database;
+Terminal=false
+StartupNotify=true

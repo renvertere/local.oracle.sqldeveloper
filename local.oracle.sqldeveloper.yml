@@ -1,0 +1,104 @@
+app-id: local.oracle.sqldeveloper
+runtime: org.freedesktop.Platform
+runtime-version: "23.08"
+sdk: org.freedesktop.Sdk
+command: sqldeveloper
+
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.openjdk17
+
+finish-args:
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+
+  - --persist=.sqldeveloper
+  - --persist=.oracle
+
+  - --env=XDG_CONFIG_HOME=/var/config
+  - --env=XDG_DATA_HOME=/var/data
+
+  - --filesystem=xdg-documents
+  - --env=JAVA_HOME=/app/jre
+  - --env=PATH=/app/jre/bin:/app/bin:/usr/bin
+
+modules:
+  - name: openjdk
+    buildsystem: simple
+    build-commands:
+      - /usr/lib/sdk/openjdk17/install.sh
+
+  - name: sqldeveloper
+    buildsystem: simple
+    sources:
+      - type: file
+        path: sources/sqldeveloper.zip
+        sha256: 3390ef58972f1f255077c49e66b171b8664773bb16e37570a7ca16acc5afb8cb
+
+      - type: file
+        path: sources/openjfx-sdk.zip
+        sha256: a205615de1deb345bf5ca93da32dad23a5f535c9ff59661656b8cee6da469496
+
+      - type: file
+        path: local.oracle.sqldeveloper.desktop
+        sha256: 95b5b7b81da1b71b2251ae424c37d453087611abeb8a6fa4fc3e3006753aee27
+      
+      - type: file
+        path: icons/local.oracle.sqldeveloper.png
+        sha256: 19847f78a9b33c780db8a7b9bc8361c02bbac0701107e109d07949ab32f8ae1d
+
+    build-commands:
+      - install -d /app/sqldeveloper
+      - bsdtar -xf sqldeveloper.zip -C /app/sqldeveloper
+      - install -d /app/openjfx
+      - bsdtar -xf openjfx-sdk.zip -C /app/openjfx
+
+      - test -d /app/sqldeveloper || (echo "ERROR: SQL Developer not extracted" >&2; exit 1)
+
+      - install -d /app/bin
+      - |
+        cat > /app/bin/sqldeveloper <<'EOF'
+        #!/bin/sh
+        set -e
+
+        export JAVA_HOME=/app/jre
+        export PATH="$JAVA_HOME/bin:$PATH"
+
+        # Locate OpenJFX SDK (javafx-sdk-<ver>)
+        JFX_BASE="$(find /app/openjfx -maxdepth 3 -type d -name 'javafx-sdk-*' 2>/dev/null | head -n 1 || true)"
+        if [ -n "$JFX_BASE" ] && [ -d "$JFX_BASE/lib" ]; then
+          export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS \
+            --module-path=$JFX_BASE/lib \
+            --add-modules=javafx.controls,javafx.fxml,javafx.graphics,javafx.base,javafx.swing,javafx.web,javafx.media"
+        fi
+
+        ROOT="/app/sqldeveloper"
+
+        for C in \
+          "$ROOT/sqldeveloper.sh" \
+          "$ROOT/sqldeveloper/bin/sqldeveloper" \
+          "$ROOT/sqldeveloper/sqldeveloper.sh" \
+          "$ROOT/sqldeveloper/bin/sqldeveloper.sh"
+        do
+          if [ -f "$C" ]; then
+            exec "$C" "$@"
+          fi
+        done
+
+        CAND="$(find "$ROOT" -maxdepth 6 -type f \( -name 'sqldeveloper.sh' -o -name 'sqldeveloper' \) | head -n 1)"
+        if [ -n "$CAND" ]; then
+          exec "$CAND" "$@"
+        fi
+
+        echo "ERROR: Could not locate SQL Developer launcher under $ROOT" >&2
+        find "$ROOT" -maxdepth 4 -type d >&2 || true
+        exit 127
+        EOF
+      - chmod +x /app/bin/sqldeveloper
+
+      - install -d /app/share/applications
+      - install -m 0644 local.oracle.sqldeveloper.desktop /app/share/applications/local.oracle.sqldeveloper.desktop
+      
+      - install -d /app/share/icons/hicolor/256x256/apps
+      - install -m 0644 local.oracle.sqldeveloper.png /app/share/icons/hicolor/256x256/apps/local.oracle.sqldeveloper.png
